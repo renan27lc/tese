@@ -1,0 +1,43 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Carregar os dados com a codificação correta
+dados = pd.read_csv('/content/sample_data/dp_br.csv', sep=';', decimal=',', thousands='.', encoding='latin-1')
+
+# Renomear a coluna longa
+dados = dados.rename(columns={
+    'DLSP': 'Dívida_USD'
+})
+
+# Função personalizada para converter datas no formato MMM/AA
+def converter_data(data_str):
+    meses = {
+        'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04',
+        'mai': '05', 'jun': '06', 'jul': '07', 'ago': '08',
+        'set': '09', 'out': '10', 'nov': '11', 'dez': '12'
+    }
+    
+    mes, ano = data_str.split('/')
+    ano = '19' + ano if int(ano) >= 90 else '20' + ano
+    return f"{ano}-{meses[mes.lower()]}-01"  # Definindo sempre dia 01
+
+# Aplicar a conversão
+dados['Data'] = dados['Data'].apply(converter_data)
+dados['Data'] = pd.to_datetime(dados['Data'])
+
+# Converter valores para float
+dados['Dívida_USD'] = dados['Dívida_USD'].astype(float)
+
+# Verificar os resultados
+print(dados.head())
+print("\nÚltimos registros:")
+print(dados.tail())
+
+# Plotar os dados
+plt.figure(figsize=(12, 6))
+plt.plot(dados['Data'], dados['Dívida_USD'])
+plt.title('Dívida Líquida do Setor Público Brasileiro (USD)')
+plt.xlabel('Ano')
+plt.ylabel('USD Milhões')
+plt.grid(True)
+plt.show()
