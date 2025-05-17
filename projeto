@@ -2,6 +2,179 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+# Função para converter números no formato brasileiro
+def br_float(x):
+    if isinstance(x, str):
+        return float(x.replace('.', '').replace(',', '.'))
+    return float(x)
+
+# Carregar os dados
+try:
+    df = pd.read_csv('/content/sample_data/dados_simul_dp_colab.csv', sep=';')
+except FileNotFoundError:
+    raise FileNotFoundError("Arquivo 'dados_simul_dp_colab.csv' não encontrado. Verifique o caminho do arquivo.")
+
+# Converter colunas numéricas
+num_cols = ['alpha (prop_dp_ar)', 'dp', 'brl_usd']
+for col in num_cols:
+    df[col] = df[col].apply(br_float)
+
+# Mapeamento de meses em português para números
+mes_pt = {
+    'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+    'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+}
+
+def parse_date(date_str):
+    mes, ano = date_str.split('/')
+    return pd.to_datetime(f"20{ano}-{mes_pt[mes]}-01")
+
+df['Data'] = df['Data'].apply(parse_date)
+df = df.sort_values('Data').reset_index(drop=True)
+
+# Calcular as colunas básicas
+df['déficit'] = df['dp'].diff()
+
+# 1. Simulação completa (2004-2023)
+df['dp_br_simul'] = df['dp'].copy()
+for i in range(1, len(df)):
+    alpha_prev = df.loc[i-1, 'alpha (prop_dp_ar)'] / 100
+    cambio_diff = df.loc[i, 'brl_usd'] - df.loc[i-1, 'brl_usd']
+    dp_simul_prev = df.loc[i-1, 'dp_br_simul']
+    df.loc[i, 'perda_cambio'] = alpha_prev * cambio_diff * dp_simul_prev
+    df.loc[i, 'dp_br_simul'] = df.loc[i-1, 'dp_br_simul'] + df.loc[i, 'déficit'] + df.loc[i, 'perda_cambio']
+
+# 2. Simulação do primeiro choque (2011-2016)
+start_idx_2011 = df[df['Data'] == pd.to_datetime('2011-01-01')].index[0]
+df['dp_br_simul_2011'] = df['dp'].copy()
+for i in range(start_idx_2011 + 1, len(df)):
+    alpha_prev = df.loc[i-1, 'alpha (prop_dp_ar)'] / 100
+    cambio_diff = df.loc[i, 'brl_usd'] - df.loc[i-1, 'brl_usd']
+    dp_simul_prev = df.loc[i-1, 'dp_br_simul_2011']
+    df.loc[i, 'perda_cambio_2011'] = alpha_prev * cambio_diff * dp_simul_prev
+    df.loc[i, 'dp_br_simul_2011'] = df.loc[i-1, 'dp_br_simul_2011'] + df.loc[i, 'déficit'] + df.loc[i, 'perda_cambio_2011']
+
+# 3. Simulação do segundo choque (2020-2021)
+start_idx_2020 = df[df['Data'] == pd.to_datetime('2020-01-01')].index[0]
+df['dp_br_simul_2020'] = df['dp'].copy()
+for i in range(start_idx_2020 + 1, len(df)):
+    alpha_prev = df.loc[i-1, 'alpha (prop_dp_ar)'] / 100
+    cambio_diff = df.loc[i, 'brl_usd'] - df.loc[i-1, 'brl_usd']
+    dp_simul_prev = df.loc[i-1, 'dp_br_simul_2020']
+    df.loc[i, 'perda_cambio_2020'] = alpha_prev * cambio_diff * dp_simul_prev
+    df.loc[i, 'dp_br_simul_2020'] = df.loc[i-1, 'dp_br_simul_2020'] + df.loc[i, 'déficit'] + df.loc[i, 'perda_cambio_2020']
+
+# Configurações visuais (usando estilo disponível)
+plt.style.use('ggplot')  # Alternativa ao seaborn
+cores = {
+    'observado': '#1f77b4',
+    'simulado_completo': '#2ca02c',
+    'simulado_2011': '#ff7f0e',
+    'simulado_2020': '#d62728'
+}
+
+# Função para criar e salvar gráficos
+def criar_grafico(data, x_col, y_cols, labels, colors, title, ylabel, xlabel, filename, highlight=None):
+    plt.figure(figsize=(14, 7))
+    
+    for y_col, label, color in zip(y_cols, labels, colors):
+        plt.plot(data[x_col], data[y_col]/1e6, label=label, linewidth=2, color=color)
+    
+    if highlight:
+        for period in highlight:
+            plt.axvspan(period[0], period[1], color='red', alpha=0.1)
+    
+    plt.title(title, fontsize=16)
+    plt.ylabel(ylabel, fontsize=12)
+    plt.xlabel(xlabel, fontsize=12)
+    plt.grid(True, linestyle=':', alpha=0.6)
+    plt.legend(fontsize=12, frameon=True, shadow=True)
+    
+    ax = plt.gca()
+    if len(data) > 24:  # Para séries longas
+        ax.xaxis.set_major_locator(mdates.YearLocator(2))
+    else:  # Para séries curtas
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    plt.xticks(rotation=45)
+    
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close()
+
+# Gráfico 1: Trajetória Completa
+criar_grafico(
+    data=df,
+    x_col='Data',
+    y_cols=['dp', 'dp_br_simul'],
+    labels=['Dívida Observada', 'Dívida Simulada (2004-2023)'],
+    colors=[cores['observado'], cores['simulado_completo']],
+    title='Trajetória Completa da Dívida Pública: 2004-2023',
+    ylabel='Valor (em milhões de R$)',
+    xlabel='Ano',
+    filename='trajetoria_completa.png',
+    highlight=[(pd.to_datetime('2011-01-01'), pd.to_datetime('2016-12-01')),
+               (pd.to_datetime('2020-01-01'), pd.to_datetime('2021-12-01'))]
+)
+
+# Gráfico 2: Primeiro Choque
+periodo1 = (df['Data'] >= '2011-01-01') & (df['Data'] <= '2016-12-01')
+criar_grafico(
+    data=df[periodo1],
+    x_col='Data',
+    y_cols=['dp', 'dp_br_simul_2011'],
+    labels=['Dívida Observada', 'Simulação a partir de jan/2011'],
+    colors=[cores['observado'], cores['simulado_2011']],
+    title='Primeiro Período de Choque (2011-2016)',
+    ylabel='Valor (em milhões de R$)',
+    xlabel='Ano',
+    filename='choque_2011_2016.png'
+)
+
+# Gráfico 3: Segundo Choque
+periodo2 = (df['Data'] >= '2020-01-01') & (df['Data'] <= '2021-12-01')
+criar_grafico(
+    data=df[periodo2],
+    x_col='Data',
+    y_cols=['dp', 'dp_br_simul_2020'],
+    labels=['Dívida Observada', 'Simulação a partir de jan/2020'],
+    colors=[cores['observado'], cores['simulado_2020']],
+    title='Segundo Período de Choque (2020-2021)',
+    ylabel='Valor (em milhões de R$)',
+    xlabel='Ano',
+    filename='choque_2020_2021.png'
+)
+
+print("Gráficos salvos com sucesso:")
+print("- trajetoria_completa.png")
+print("- choque_2011_2016.png")
+print("- choque_2020_2021.png")
+
+
+# Salvar os resultados em arquivos CSV
+# 1. Dados completos com todas as simulações
+df.to_csv('resultados_completos.csv', sep=';', decimal=',', index=False, 
+          float_format='%.2f', encoding='utf-8-sig')
+
+# 2. Resultados do primeiro período de choque (2011-2016)
+periodo1 = (df['Data'] >= '2011-01-01') & (df['Data'] <= '2016-12-01')
+df[periodo1].to_csv('resultados_choque_2011_2016.csv', sep=';', decimal=',', 
+                   index=False, float_format='%.2f', encoding='utf-8-sig')
+
+# 3. Resultados do segundo período de choque (2020-2021)
+periodo2 = (df['Data'] >= '2020-01-01') & (df['Data'] <= '2021-12-01')
+df[periodo2].to_csv('resultados_choque_2020_2021.csv', sep=';', decimal=',', 
+                   index=False, float_format='%.2f', encoding='utf-8-sig')
+
+print("\nArquivos CSV salvos com sucesso:")
+print("- resultados_completos.csv (todos os dados)")
+print("- resultados_choque_2011_2016.csv (período 2011-2016)")
+print("- resultados_choque_2020_2021.csv (período 2020-2021)")
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+
 # Função alternativa para converter números no formato brasileiro
 def br_float(x):
     if isinstance(x, str):
