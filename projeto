@@ -1,166 +1,164 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
-# Carregar os dados (ajuste o caminho do arquivo conforme necessário)
-df = pd.read_csv('/content/sample_data/selic.csv', sep=';', decimal=',', parse_dates=['Data'], dayfirst=True)
+# Função alternativa para converter números no formato brasileiro
+def br_float(x):
+    if isinstance(x, str):
+        # Remove pontos de milhar e substitui vírgula decimal por ponto
+        return float(x.replace('.', '').replace(',', '.'))
+    return float(x)
 
-# Converter a coluna Selic para string antes de usar .str para tratar a vírgula como decimal
-# Garante que a coluna é tratada como texto antes de substituir a vírgula
-df['Selic'] = df['Selic'].astype(str).str.replace(',', '.', regex=False).astype(float)
+# Carregar os dados
+df = pd.read_csv('/content/sample_data/dados_simul_dp_colab.csv', sep=';')
 
-# Extrair ano e mês para agrupamento
-df['AnoMes'] = df['Data'].dt.to_period('M')
+# Converter colunas numéricas
+num_cols = ['alpha (prop_dp_ar)', 'dp', 'brl_usd']
+for col in num_cols:
+    df[col] = df[col].apply(br_float)
 
-# Calcular média mensal
-selic_mensal = df.groupby('AnoMes')['Selic'].mean().reset_index()
-selic_mensal.columns = ['Data', 'Selic_Media']
+# Converter datas (formato abreviado mês/ano)
+# Mapeamento de meses em português para números
+mes_pt = {
+    'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+    'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+}
 
-# Converter o período para datetime (opcional)
-selic_mensal['Data'] = selic_mensal['Data'].dt.to_timestamp()
+def parse_date(date_str):
+    mes, ano = date_str.split('/')
+    return pd.to_datetime(f"20{ano}-{mes_pt[mes]}-01")
+
+df['Data'] = df['Data'].apply(parse_date)
 
 # Ordenar por data
-selic_mensal = selic_mensal.sort_values('Data')
+df = df.sort_values('Data').reset_index(drop=True)
 
-# Salvar em novo arquivo CSV
-selic_mensal.to_csv('selic_mensal.csv', index=False, decimal=',', sep=';')
+# Inicializar colunas calculadas
+df['déficit'] = 0.0
+df['perda_cambio'] = 0.0
+df['dp_br_simul'] = 0.0
+df['dp_br_simul_choques'] = 0.0
 
-# Mostrar resultado
-print(selic_mensal.head())
+# Primeira linha (inicialização)
+df.loc[0, 'dp_br_simul'] = df.loc[0, 'dp']
+df.loc[0, 'dp_br_simul_choques'] = df.loc[0, 'dp']
 
-
-
-
-
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# Carregar os dados com a codificação correta
-dados = pd.read_csv('/content/sample_data/dp_br.csv', sep=';', decimal=',', thousands='.', encoding='latin-1')
-
-# Renomear a coluna longa
-dados = dados.rename(columns={
-    'DLSP': 'Dívida_USD'
-})
-
-# Função personalizada para converter datas no formato MMM/AA
-def converter_data(data_str):
-    meses = {
-        'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04',
-        'mai': '05', 'jun': '06', 'jul': '07', 'ago': '08',
-        'set': '09', 'out': '10', 'nov': '11', 'dez': '12'
-    }
+# Calcular as linhas subsequentes
+for i in range(1, len(df)):
+    # Cálculo do déficit
+    df.loc[i, 'déficit'] = df.loc[i, 'dp'] - df.loc[i-1, 'dp']
     
-    mes, ano = data_str.split('/')
-    ano = '19' + ano if int(ano) >= 90 else '20' + ano
-    return f"{ano}-{meses[mes.lower()]}-01"  # Definindo sempre dia 01
+    # Cálculo da perda cambial
+    alpha_prev = df.loc[i-1, 'alpha (prop_dp_ar)'] / 100
+    cambio_diff = df.loc[i, 'brl_usd'] - df.loc[i-1, 'brl_usd']
+    dp_simul_prev = df.loc[i-1, 'dp_br_simul']
+    df.loc[i, 'perda_cambio'] = alpha_prev * cambio_diff * dp_simul_prev
+    
+    # Cálculo da dívida simulada
+    df.loc[i, 'dp_br_simul'] = df.loc[i-1, 'dp_br_simul'] + df.loc[i, 'déficit'] + df.loc[i, 'perda_cambio']
+    
+    # Cálculo da dívida simulada com choques
+    df.loc[i, 'dp_br_simul_choques'] = df.loc[i-1, 'dp_br_simul_choques'] + df.loc[i, 'déficit'] + df.loc[i, 'perda_cambio']
 
-# Aplicar a conversão
-dados['Data'] = dados['Data'].apply(converter_data)
-dados['Data'] = pd.to_datetime(dados['Data'])
+# Função para formatar números no estilo brasileiro
+def format_br(number):
+    if pd.isna(number):
+        return ''
+    return f"{number:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# Converter valores para float
-dados['Dívida_USD'] = dados['Dívida_USD'].astype(float)
+# Mostrar as primeiras linhas para verificação
+print(df.head(10).applymap(lambda x: format_br(x) if isinstance(x, (int, float)) else x))
 
-# Verificar os resultados
-print(dados.head())
-print("\nÚltimos registros:")
-print(dados.tail())
-
-# Plotar os dados
+# Exportar para CSV (opcional)
+# Criamos uma cópia para formatação de saída
+df_out = df.copy()
+for col in ['dp', 'brl_usd', 'déficit', 'perda_cambio', 'dp_br_simul', 'dp_br_simul_choques']:
+    df_out[col] = df_out[col].apply(lambda x: format_br(x) if not pd.isna(x) else '')
+# Criar o gráfico comparativo
 plt.figure(figsize=(12, 6))
-plt.plot(dados['Data'], dados['Dívida_USD'])
-plt.title('Dívida Líquida do Setor Público Brasileiro (USD)')
-plt.xlabel('Ano')
-plt.ylabel('USD Milhões')
-plt.grid(True)
+
+# Plotar ambas as séries
+plt.plot(df['Data'], df['dp']/1e6, label='Dívida Observada', linewidth=2)
+plt.plot(df['Data'], df['dp_br_simul']/1e6, label='Dívida Simulada', linewidth=2, linestyle='--')
+
+# Configurações do gráfico
+plt.title('Trajetória da Dívida Pública: Observada vs Simulada', fontsize=14)
+plt.xlabel('Ano', fontsize=12)
+plt.ylabel('Valor (em milhões)', fontsize=12)
+plt.grid(True, linestyle='--', alpha=0.7)
+
+# Formatando o eixo x para mostrar anos
+plt.gca().xaxis.set_major_locator(mdates.YearLocator())
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+plt.gcf().autofmt_xdate()  # Rotaciona as datas para melhor visualização
+
+# Adicionar legenda
+plt.legend(fontsize=12)
+
+# Mostrar o gráfico
+plt.tight_layout()
 plt.show()
+# Encontrar o índice do início do primeiro período de choque (jan/2011)
+start_idx = df[df['Data'] == pd.to_datetime('2011-01-01')].index[0]
 
+# Opcional: Salvar o gráfico
+plt.savefig('comparativo_divida.png', dpi=300, bbox_inches='tight')
 
+# 1. Primeiro reset em jan/2011 (como você já fez)
+start_idx_2011 = df[df['Data'] == pd.to_datetime('2011-01-01')].index[0]
+df['dp_br_simul'] = df['dp'].copy()  # Começa igual ao observado
 
+# 2. Aplicar a simulação a partir de jan/2011
+for i in range(start_idx_2011 + 1, len(df)):
+    df.loc[i, 'déficit'] = df.loc[i, 'dp'] - df.loc[i-1, 'dp']
+    alpha_prev = df.loc[i-1, 'alpha (prop_dp_ar)'] / 100
+    cambio_diff = df.loc[i, 'brl_usd'] - df.loc[i-1, 'brl_usd']
+    dp_simul_prev = df.loc[i-1, 'dp_br_simul']
+    df.loc[i, 'perda_cambio'] = alpha_prev * cambio_diff * dp_simul_prev
+    df.loc[i, 'dp_br_simul'] = df.loc[i-1, 'dp_br_simul'] + df.loc[i, 'déficit'] + df.loc[i, 'perda_cambio']
 
+# 3. Segundo reset em jan/2020 - criar uma nova coluna para esta simulação
+start_idx_2020 = df[df['Data'] == pd.to_datetime('2020-01-01')].index[0]
+df['dp_br_simul_2020'] = df['dp'].copy()  # Nova coluna que começa igual ao observado em 2020
 
+# 4. Aplicar a simulação a partir de jan/2020 usando os valores anteriores até 2019
+for i in range(start_idx_2020 + 1, len(df)):
+    df.loc[i, 'déficit'] = df.loc[i, 'dp'] - df.loc[i-1, 'dp']
+    alpha_prev = df.loc[i-1, 'alpha (prop_dp_ar)'] / 100
+    cambio_diff = df.loc[i, 'brl_usd'] - df.loc[i-1, 'brl_usd']
+    dp_simul_prev = df.loc[i-1, 'dp_br_simul_2020']
+    df.loc[i, 'perda_cambio_2020'] = alpha_prev * cambio_diff * dp_simul_prev
+    df.loc[i, 'dp_br_simul_2020'] = df.loc[i-1, 'dp_br_simul_2020'] + df.loc[i, 'déficit'] + df.loc[i, 'perda_cambio_2020']
 
-import pandas as pd
-import matplotlib.pyplot as plt
+# Criar os gráficos
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
 
-# Carregar os dados com a codificação correta
-dados = pd.read_csv('/content/sample_data/pib_br.csv', sep=';', decimal=',', thousands='.', encoding='latin-1')
+# Gráfico 1: 2011-2016
+ax1.plot(df.loc[periodo_choque1, 'Data'], df.loc[periodo_choque1, 'dp']/1e6, 
+        label='Dívida Observada', linewidth=2, color='#1f77b4')
+ax1.plot(df.loc[periodo_choque1, 'Data'], df.loc[periodo_choque1, 'dp_br_simul']/1e6, 
+        label='Simulação a partir de jan/2011', linewidth=2, linestyle='--', color='#ff7f0e')
+ax1.set_title('Primeiro Período de Choque (2011-2016)\nSimulação iniciando em jan/2011', fontsize=12)
+ax1.set_ylabel('Valor (em milhões)')
+ax1.legend()
+ax1.grid(True, linestyle=':', alpha=0.6)
 
+# Gráfico 2: 2020-2021
+ax2.plot(df.loc[periodo_choque2, 'Data'], df.loc[periodo_choque2, 'dp']/1e6, 
+        label='Dívida Observada', linewidth=2, color='#1f77b4')
+ax2.plot(df.loc[periodo_choque2, 'Data'], df.loc[periodo_choque2, 'dp_br_simul_2020']/1e6, 
+        label='Simulação a partir de jan/2020', linewidth=2, linestyle='--', color='#d62728')
+ax2.set_title('Segundo Período de Choque (2020-2021)\nSimulação iniciando em jan/2020', fontsize=12)
+ax2.set_ylabel('Valor (em milhões)')
+ax2.legend()
+ax2.grid(True, linestyle=':', alpha=0.6)
 
+# Formatar eixos de data
+for ax in [ax1, ax2]:
+    ax.xaxis.set_major_locator(mdates.YearLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    plt.setp(ax.get_xticklabels(), rotation=45)
 
-# Função personalizada para converter datas no formato MMM/AA
-def converter_data(data_str):
-    meses = {
-        'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04',
-        'mai': '05', 'jun': '06', 'jul': '07', 'ago': '08',
-        'set': '09', 'out': '10', 'nov': '11', 'dez': '12'
-    }
-    
-    mes, ano = data_str.split('/')
-    ano = '19' + ano if int(ano) >= 90 else '20' + ano
-    return f"{ano}-{meses[mes.lower()]}-01"  # Definindo sempre dia 01
-
-# Aplicar a conversão
-dados['Data'] = dados['Data'].apply(converter_data)
-dados['Data'] = pd.to_datetime(dados['Data'])
-
-# Converter valores para float
-dados['GDP_br'] = dados['GDP_br'].astype(float)
-
-# Verificar os resultados
-print(dados.head())
-print("\nÚltimos registros:")
-print(dados.tail())
-
-# Plotar os dados
-plt.figure(figsize=(12, 6))
-plt.plot(dados['Data'], dados['GDP_br'])
-plt.title('Produto Interno Bruto Brasileiro (USD)')
-plt.xlabel('Ano')
-plt.ylabel('USD Milhões')
-plt.grid(True)
-plt.show()
-
-
-
-
-
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# Carregar os dados com a codificação correta
-dados = pd.read_csv('/content/sample_data/cambio_br.csv', sep=';', decimal=',', thousands='.', encoding='latin-1')
-
-
-
-# Função personalizada para converter datas no formato MMM/AA
-def converter_data(data_str):
-    meses = {
-        'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04',
-        'mai': '05', 'jun': '06', 'jul': '07', 'ago': '08',
-        'set': '09', 'out': '10', 'nov': '11', 'dez': '12'
-    }
-    
-    mes, ano = data_str.split('/')
-    ano = '19' + ano if int(ano) >= 90 else '20' + ano
-    return f"{ano}-{meses[mes.lower()]}-01"  # Definindo sempre dia 01
-
-# Aplicar a conversão
-dados['Data'] = dados['Data'].apply(converter_data)
-dados['Data'] = pd.to_datetime(dados['Data'])
-
-# Converter valores para float
-dados['BRL_to_USD'] = dados['BRL_to_USD'].astype(float)
-
-# Verificar os resultados
-print(dados.head())
-print("\nÚltimos registros:")
-print(dados.tail())
-
-# Plotar os dados
-plt.figure(figsize=(12, 6))
-plt.plot(dados['Data'], dados['BRL_to_USD'])
-plt.title('Câmbio Brasil')
-plt.xlabel('Ano')
-plt.ylabel('BRL/USD')
-plt.grid(True)
+plt.tight_layout()
+plt.savefig('comparativo_choques_com_reset.png', dpi=300, bbox_inches='tight')
 plt.show()
