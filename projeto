@@ -1,3 +1,93 @@
+
+
+
+#==============---------------------- gráfico inflacao_ar_br ----------------------==============#
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Carregar os dados
+df = pd.read_csv('/content/sample_data/inflacao_colab.csv', sep=';', decimal=',')
+
+# Converter ANO para inteiro
+df['ANO'] = df['ANO'].astype(int)
+
+# Criar o gráfico
+plt.figure(figsize=(12, 6))
+plt.plot(df['ANO'], df['ln(AR/BR)'], marker='o', linestyle='-', color='b', linewidth=2)
+
+# Adicionar título e rótulos
+plt.title('Evolução do ln(IPC Argentina / IPCA Brasil) - 1987 a 2024', fontsize=14)
+plt.xlabel('Ano', fontsize=12)
+plt.ylabel('ln(AR/BR)', fontsize=12)
+
+# Configurar eixo x
+plt.xticks(df['ANO'][::2], rotation=45)
+
+# Adicionar elementos visuais
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.axhline(y=0, color='r', linestyle='--', linewidth=1)
+
+# Ajustar layout
+plt.tight_layout()
+
+# Salvar o gráfico em PDF
+plt.savefig('import pandas as pd
+import matplotlib.pyplot as plt
+
+# Carregar os dados
+df = pd.read_csv('/content/sample_data/inflacao_colab.csv', sep=';', decimal=',')
+
+# Converter ANO para inteiro
+df['ANO'] = df['ANO'].astype(int)
+
+# Criar o gráfico
+plt.figure(figsize=(12, 6))
+plt.plot(df['ANO'], df['ln(AR/BR)'], marker='o', linestyle='-', color='b', linewidth=2)
+
+# Adicionar título e rótulos
+plt.title('Evolução do ln(IPC Argentina / IPCA Brasil) - 1987 a 2024', fontsize=14)
+plt.xlabel('Ano', fontsize=12)
+plt.ylabel('ln(AR/BR)', fontsize=12)
+
+# Configurar eixo x
+plt.xticks(df['ANO'][::2], rotation=45)
+
+# Adicionar elementos visuais
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.axhline(y=0, color='r', linestyle='--', linewidth=1)
+
+# Ajustar layout
+plt.tight_layout()
+
+# Salvar o gráfico em PDF
+plt.savefig('inflacao_ar_br.pdf', format='pdf', dpi=300)
+
+# Mostrar o gráfico (opcional)
+plt.show().pdf', format='pdf', dpi=300)
+
+# Mostrar o gráfico (opcional)
+plt.show()
+
+
+
+
+
+
+
+
+
+#==============---------------------- resultados preliminares (dívida pública brasileira com estrutura cambial argentina) ----------------------==============#
+
+
+
+
+
+
+
+
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -123,7 +213,7 @@ criar_grafico(
     title='Evolução da taxa de câmbio BRL/USD: 2004-2023',
     ylabel='Valor (em R$)',
     xlabel='Ano',
-    filename='trajetoria_cambio.png',
+    filename='trajetoria_cambio.pdf',
     highlight=[(pd.to_datetime('2008-07-01'), pd.to_datetime('2008-12-01')),
                (pd.to_datetime('2011-07-01'), pd.to_datetime('2016-01-01')),
                (pd.to_datetime('2020-01-01'), pd.to_datetime('2021-03-01'))]
@@ -140,7 +230,7 @@ criar_grafico(
     title='Trajetória Completa da Dívida Pública: 2004-2023',
     ylabel='Valor (em milhões de R$)',
     xlabel='Ano',
-    filename='trajetoria_completa.png',
+    filename='trajetoria_completa.pdf',
     highlight=[(pd.to_datetime('2008-07-01'), pd.to_datetime('2008-12-01')),
                (pd.to_datetime('2011-07-01'), pd.to_datetime('2016-01-01')),
                (pd.to_datetime('2020-01-01'), pd.to_datetime('2021-03-01'))]
@@ -157,7 +247,7 @@ criar_grafico(
     title='Primeiro Período de Choque (jul/08 - dez/08)',
     ylabel='Valor (em milhões de R$)',
     xlabel='Ano',
-    filename='choque_0708_1208.png'
+    filename='choque_0708_1208.pdf'
 )
 
 # Gráfico 3: Segundo Choque
@@ -171,7 +261,7 @@ criar_grafico(
     title='Segundo Período de Choque (jul/11 - jan/16)',
     ylabel='Valor (em milhões de R$)',
     xlabel='Ano',
-    filename='choque_0711_0116.png'
+    filename='choque_0711_0116.pdf'
 )
 
 # Gráfico 4: Terceiro Choque
@@ -185,7 +275,7 @@ criar_grafico(
     title='Terceiro Período de Choque (jan/20 - mar/21)',
     ylabel='Valor (em milhões de R$)',
     xlabel='Ano',
-    filename='choque_0120_0321.png'
+    filename='choque_0120_0321.pdf'
 )
 
 
@@ -208,4 +298,13 @@ df[periodo1].to_csv('resultados_choque_2011_2016.csv', sep=';', decimal=',',
 periodo2 = (df['Data'] >= '2020-01-01') & (df['Data'] <= '2021-12-01')
 df[periodo2].to_csv('resultados_choque_2020_2021.csv', sep=';', decimal=',',
                    index=False, float_format='%.2f', encoding='utf-8-sig')
+
+
+
+
+
+
+
+
+
 
