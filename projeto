@@ -33,7 +33,7 @@ plt.axhline(y=0, color='r', linestyle='--', linewidth=1)
 plt.tight_layout()
 
 # Salvar o gráfico em PDF
-plt.savefig('evolucao_inflacao_ar_br.pdf', format='pdf', dpi=300)
+plt.savefig('inflacao_ar_br.pdf', format='pdf', dpi=300)
 
 # Mostrar o gráfico (opcional)
 plt.show()
