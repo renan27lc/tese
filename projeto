@@ -18,7 +18,7 @@ plt.figure(figsize=(12, 6))
 plt.plot(df['ANO'], df['ln(AR/BR)'], marker='o', linestyle='-', color='b', linewidth=2)
 
 # Adicionar título e rótulos
-plt.title('Evolução do ln(IPC Argentina / IPCA Brasil) - 1987 a 2024', fontsize=14)
+plt.title('Evolução do ln(inf_AR/inf_BR) - 1968 a 2024 (MM8)', fontsize=14)
 plt.xlabel('Ano', fontsize=12)
 plt.ylabel('ln(AR/BR)', fontsize=12)
 
@@ -33,43 +33,10 @@ plt.axhline(y=0, color='r', linestyle='--', linewidth=1)
 plt.tight_layout()
 
 # Salvar o gráfico em PDF
-plt.savefig('import pandas as pd
-import matplotlib.pyplot as plt
-
-# Carregar os dados
-df = pd.read_csv('/content/sample_data/inflacao_colab.csv', sep=';', decimal=',')
-
-# Converter ANO para inteiro
-df['ANO'] = df['ANO'].astype(int)
-
-# Criar o gráfico
-plt.figure(figsize=(12, 6))
-plt.plot(df['ANO'], df['ln(AR/BR)'], marker='o', linestyle='-', color='b', linewidth=2)
-
-# Adicionar título e rótulos
-plt.title('Evolução do ln(IPC Argentina / IPCA Brasil) - 1987 a 2024', fontsize=14)
-plt.xlabel('Ano', fontsize=12)
-plt.ylabel('ln(AR/BR)', fontsize=12)
-
-# Configurar eixo x
-plt.xticks(df['ANO'][::2], rotation=45)
-
-# Adicionar elementos visuais
-plt.grid(True, linestyle='--', alpha=0.7)
-plt.axhline(y=0, color='r', linestyle='--', linewidth=1)
-
-# Ajustar layout
-plt.tight_layout()
-
-# Salvar o gráfico em PDF
-plt.savefig('inflacao_ar_br.pdf', format='pdf', dpi=300)
-
-# Mostrar o gráfico (opcional)
-plt.show().pdf', format='pdf', dpi=300)
+plt.savefig('evolucao_inflacao_ar_br.pdf', format='pdf', dpi=300)
 
 # Mostrar o gráfico (opcional)
 plt.show()
-
 
 
 
