@@ -55,6 +55,12 @@ plt.show()
 
 
 
+
+
+
+
+
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -84,7 +90,13 @@ mes_pt = {
 
 def parse_date(date_str):
     mes, ano = date_str.split('/')
-    return pd.to_datetime(f"20{ano}-{mes_pt[mes]}-01")
+    # Converte o ano para inteiro e determina o século
+    ano_int = int(ano)
+    # Se o ano for maior ou igual a 24, assume século 20 (1924-1999)
+    # Se for menor que 24, assume século 21 (2000-2023)
+    ano_completo = 1900 + ano_int if ano_int >= 24 else 2000 + ano_int
+    return pd.to_datetime(f"{ano_completo}-{mes_pt[mes]}-01")
+
 
 df['Data'] = df['Data'].apply(parse_date)
 df = df.sort_values('Data').reset_index(drop=True)
@@ -92,7 +104,7 @@ df = df.sort_values('Data').reset_index(drop=True)
 # Calcular as colunas básicas
 df['déficit'] = df['dp'].diff()
 
-# 1. Simulação completa (2004-2023)
+# 1. Simulação completa (1998-2023)
 df['dp_br_simul'] = df['dp'].copy()
 for i in range(1, len(df)):
     alpha_prev = df.loc[i-1, 'alpha (prop_dp_ar)'] / 100
@@ -100,6 +112,16 @@ for i in range(1, len(df)):
     dp_simul_prev = df.loc[i-1, 'dp_br_simul']
     df.loc[i, 'perda_cambio'] = alpha_prev * cambio_diff * dp_simul_prev
     df.loc[i, 'dp_br_simul'] = df.loc[i-1, 'dp_br_simul'] + df.loc[i, 'déficit'] + df.loc[i, 'perda_cambio']
+
+# 2. Simulação do primeiro choque (0199-1002)
+start_idx_1999 = df[df['Data'] == pd.to_datetime('1999-01-01')].index[0]
+df['dp_br_simul_1999'] = df['dp'].copy()
+for i in range(start_idx_1999 + 1, len(df)):
+    alpha_prev = df.loc[i-1, 'alpha (prop_dp_ar)'] / 100
+    cambio_diff = df.loc[i, 'brl_usd'] - df.loc[i-1, 'brl_usd']
+    dp_simul_prev = df.loc[i-1, 'dp_br_simul_1999']
+    df.loc[i, 'perda_cambio_1999'] = alpha_prev * cambio_diff * dp_simul_prev
+    df.loc[i, 'dp_br_simul_1999'] = df.loc[i-1, 'dp_br_simul_1999'] + df.loc[i, 'déficit'] + df.loc[i, 'perda_cambio_1999']
 
 # 2. Simulação do primeiro choque (0708-1208)
 start_idx_0708 = df[df['Data'] == pd.to_datetime('2008-07-01')].index[0]
@@ -136,6 +158,7 @@ plt.style.use('ggplot')  # Alternativa ao seaborn
 cores = {
     'observado': '#1f77b4',
     'simulado_completo': '#2ca02c',
+    'simulado_1999': '#7f7f7f',
     'simulado_2008': '#9467bd',
     'simulado_2011': '#ff7f0e',
     'simulado_2020': '#d62728'
@@ -177,11 +200,12 @@ criar_grafico(
     y_cols=['brl_usd'],
     labels=['Taxa de câmbio'],
     colors=[cores['observado']],
-    title='Evolução da taxa de câmbio BRL/USD: 2004-2023',
+    title='Evolução da taxa de câmbio BRL/USD: 1998-2023',
     ylabel='Valor (em R$)',
     xlabel='Ano',
     filename='trajetoria_cambio.pdf',
-    highlight=[(pd.to_datetime('2008-07-01'), pd.to_datetime('2008-12-01')),
+    highlight=[(pd.to_datetime('1999-01-01'), pd.to_datetime('2002-10-01')),
+               (pd.to_datetime('2008-07-01'), pd.to_datetime('2008-12-01')),
                (pd.to_datetime('2011-07-01'), pd.to_datetime('2016-01-01')),
                (pd.to_datetime('2020-01-01'), pd.to_datetime('2021-03-01'))]
 )
@@ -192,21 +216,36 @@ criar_grafico(
     data=df,
     x_col='Data',
     y_cols=['dp', 'dp_br_simul'],
-    labels=['Dívida Observada', 'Dívida Simulada (2004-2023)'],
+    labels=['Dívida Observada', 'Dívida Simulada (1998-2023)'],
     colors=[cores['observado'], cores['simulado_completo']],
-    title='Trajetória Completa da Dívida Pública: 2004-2023',
+    title='Trajetória Completa da Dívida Pública: 1998-2023',
     ylabel='Valor (em milhões de R$)',
     xlabel='Ano',
     filename='trajetoria_completa.pdf',
-    highlight=[(pd.to_datetime('2008-07-01'), pd.to_datetime('2008-12-01')),
+    highlight=[(pd.to_datetime('1999-01-01'), pd.to_datetime('2002-10-01')),
+               (pd.to_datetime('2008-07-01'), pd.to_datetime('2008-12-01')),
                (pd.to_datetime('2011-07-01'), pd.to_datetime('2016-01-01')),
                (pd.to_datetime('2020-01-01'), pd.to_datetime('2021-03-01'))]
 )
 
 # Gráfico 2: Primeiro Choque
-periodo1 = (df['Data'] >= '2008-07-01') & (df['Data'] <= '2008-12-01')
+periodo1 = (df['Data'] >= '1999-01-01') & (df['Data'] <= '2002-10-01')
 criar_grafico(
     data=df[periodo1],
+    x_col='Data',
+    y_cols=['dp', 'dp_br_simul_1999'],
+    labels=['Dívida Observada', 'Simulação a partir de jan/1999'],
+    colors=[cores['observado'], cores['simulado_1999']],
+    title='Primeiro Período de Choque (jan/99 - out/02)',
+    ylabel='Valor (em milhões de R$)',
+    xlabel='Ano',
+    filename='choque_1999_2002.pdf'
+)
+
+# Gráfico 2: Primeiro Choque
+periodo2 = (df['Data'] >= '2008-07-01') & (df['Data'] <= '2008-12-01')
+criar_grafico(
+    data=df[periodo2],
     x_col='Data',
     y_cols=['dp', 'dp_br_simul_2008'],
     labels=['Dívida Observada', 'Simulação a partir de jul/2008'],
@@ -218,9 +257,9 @@ criar_grafico(
 )
 
 # Gráfico 3: Segundo Choque
-periodo2 = (df['Data'] >= '2011-07-01') & (df['Data'] <= '2016-01-01')
+periodo3 = (df['Data'] >= '2011-07-01') & (df['Data'] <= '2016-01-01')
 criar_grafico(
-    data=df[periodo2],
+    data=df[periodo3],
     x_col='Data',
     y_cols=['dp', 'dp_br_simul_2011'],
     labels=['Dívida Observada', 'Simulação a partir de jan/2011'],
@@ -232,9 +271,9 @@ criar_grafico(
 )
 
 # Gráfico 4: Terceiro Choque
-periodo3 = (df['Data'] >= '2020-01-01') & (df['Data'] <= '2021-03-01')
+periodo4 = (df['Data'] >= '2020-01-01') & (df['Data'] <= '2021-03-01')
 criar_grafico(
-    data=df[periodo3],
+    data=df[periodo4],
     x_col='Data',
     y_cols=['dp', 'dp_br_simul_2020'],
     labels=['Dívida Observada', 'Simulação a partir de jan/2020'],
@@ -252,18 +291,23 @@ df.to_csv('resultados_completos.csv', sep=';', decimal=',', index=False,
           float_format='%.2f', encoding='utf-8-sig')
 
 # 2. Resultados do primeiro período de choque (2008)
-periodo1 = (df['Data'] >= '2008-07-01') & (df['Data'] <= '2008-12-01')
-df[periodo1].to_csv('resultados_choque_2008.csv', sep=';', decimal=',',
+periodo1 = (df['Data'] >= '1999-01-01') & (df['Data'] <= '2002-10-01')
+df[periodo1].to_csv('resultados_choque_1999.csv', sep=';', decimal=',',
+                   index=False, float_format='%.2f', encoding='utf-8-sig')
+
+# 2. Resultados do primeiro período de choque (2008)
+periodo2 = (df['Data'] >= '2008-07-01') & (df['Data'] <= '2008-12-01')
+df[periodo2].to_csv('resultados_choque_2008.csv', sep=';', decimal=',',
                    index=False, float_format='%.2f', encoding='utf-8-sig')
 
 # 3. Resultados do primeiro período de choque (2011-2016)
-periodo1 = (df['Data'] >= '2011-01-01') & (df['Data'] <= '2016-12-01')
-df[periodo1].to_csv('resultados_choque_2011_2016.csv', sep=';', decimal=',',
+periodo3 = (df['Data'] >= '2011-01-01') & (df['Data'] <= '2016-12-01')
+df[periodo3].to_csv('resultados_choque_2011_2016.csv', sep=';', decimal=',',
                    index=False, float_format='%.2f', encoding='utf-8-sig')
 
 # 4. Resultados do segundo período de choque (2020-2021)
-periodo2 = (df['Data'] >= '2020-01-01') & (df['Data'] <= '2021-12-01')
-df[periodo2].to_csv('resultados_choque_2020_2021.csv', sep=';', decimal=',',
+periodo4 = (df['Data'] >= '2020-01-01') & (df['Data'] <= '2021-12-01')
+df[periodo4].to_csv('resultados_choque_2020_2021.csv', sep=';', decimal=',',
                    index=False, float_format='%.2f', encoding='utf-8-sig')
 
 
